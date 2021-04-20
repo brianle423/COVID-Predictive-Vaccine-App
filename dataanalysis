@@ -1,0 +1,40 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+Created on Tue Apr 20 13:25:15 2021
+
+@author: Brian
+"""
+#importing the goods
+import pandas as pd
+import matplotlib.pyplot as plt
+import numpy as np
+#import seaborn as sns
+#from sklearn import linear_model
+#from sklearn import train_test_split
+import warnings
+warnings.filterwarnings('ignore')
+
+
+df = pd.read_csv('/Users/Brian/PycharmProjects/CreateTask/vaccinedata/country_vaccinations.csv')
+
+#removing rows
+df = df.drop(['source_website', 'source_name'], axis=1)
+
+
+#selecting USA rows
+USA = df[df.country == 'United States']
+x = USA['date']
+y = USA['people_fully_vaccinated_per_hundred']
+
+#plotting USA Vaccinations
+USA_fig = plt.figure()
+plt.scatter(x, y)
+#plt.xticks(rotation=90)
+#labeling graph
+plt.title('Total People Vaccinated Over Time in the United States')
+plt.xlabel('Date')
+plt.ylabel('Percentage of People Fully Vacinated')
+plt.show()
+
+
