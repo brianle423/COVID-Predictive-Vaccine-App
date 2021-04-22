@@ -9,7 +9,7 @@ Created on Tue Apr 20 13:25:15 2021
 import pandas as pd
 import matplotlib.pyplot as plt
 import numpy as np
-#import seaborn as sns
+import seaborn as sns
 #from sklearn import linear_model
 #from sklearn import train_test_split
 import warnings
@@ -23,7 +23,7 @@ df = df.drop(['source_website', 'source_name'], axis=1)
 
 
 #selecting USA rows
-USA = df[df.country == 'United States']
+'''USA = df[df.country == 'United States']
 x = USA['date']
 y = USA['people_fully_vaccinated_per_hundred']
 
@@ -35,6 +35,19 @@ plt.scatter(x, y)
 plt.title('Total People Vaccinated Over Time in the United States')
 plt.xlabel('Date')
 plt.ylabel('Percentage of People Fully Vacinated')
-plt.show()
+plt.show()'''
+
+#clean up massive dataset
+df2 = pd.read_csv('/Users/Brian/PycharmProjects/CreateTask/owid-covid-data.csv')
+
+corrmat = df2.corr()
+f, ax = plt.subplot(figsize=(12,9))
+sns.heatmap(corrmat, vmax=.8, square = True);
+
+#find vaccination rate
+#heatmap to find factors that correlate the most
+#plug into regression 
+#input for country
+#app to display output
 
 
