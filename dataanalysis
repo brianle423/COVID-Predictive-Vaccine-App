@@ -10,44 +10,185 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import numpy as np
 import seaborn as sns
-#from sklearn import linear_model
-#from sklearn import train_test_split
+
+from sklearn.linear_model import LinearRegression
+import scipy
+from scipy import stats
+from scipy.optimize import curve_fit
+import statsmodels.api as sm
+from shapely.geometry import LineString, Point
+
 import warnings
+import datetime
+from datetime import date
+
+#Plotly
+import plotly.express as px
+import plotly.io as pio
+import json
+
 warnings.filterwarnings('ignore')
 
 
-df = pd.read_csv('/Users/Brian/PycharmProjects/CreateTask/vaccinedata/country_vaccinations.csv')
+vaccine_df = pd.read_csv('/Users/Brian/PycharmProjects/CreateTask/vaccinedata/country_vaccinations.csv')
 
-#removing rows
-df = df.drop(['source_website', 'source_name'], axis=1)
+#%%
+#Missing Data
+vaccine_df = vaccine_df.drop(['source_website', 'source_name'], axis=1)
+
+#total_vaccinations and people_vaccinated
+vaccine_df = vaccine_df.drop(vaccine_df[vaccine_df['total_vaccinations'].isna()].index)
+check_vaccine = vaccine_df.drop(vaccine_df[vaccine_df['people_vaccinated'].isna()].index)
+
+#people_vaccinated and people_vaccinated_per_hundred
+#plt.subplots(figsize=(8,8))
+#sns.heatmap(check_vaccine.corr(), annot=True, square=True)
+#print(scipy.stats.mannwhitneyu(check_vaccine['total_vaccinations'], check_vaccine['people_vaccinated'], alternative='two-sided'))
+#print(scipy.stats.mannwhitneyu(check_vaccine['total_vaccinations_per_hundred'], check_vaccine['people_vaccinated_per_hundred'], alternative='two-sided'))
+
+mean = check_vaccine['total_vaccinations'].mean() - check_vaccine['people_vaccinated'].mean()
+mean_per_hundred = check_vaccine['total_vaccinations_per_hundred'].mean() - check_vaccine['people_vaccinated_per_hundred'].mean()
+vaccine_df['people_vaccinated'] = vaccine_df['people_vaccinated'].fillna(vaccine_df['total_vaccinations'] - mean)
+vaccine_df['people_vaccinated_per_hundred'] = vaccine_df['people_vaccinated_per_hundred'].fillna(vaccine_df['total_vaccinations_per_hundred'] - mean_per_hundred)
+#print(vaccine_df.isna().sum())
+
+#daily_vaccinations and daily_vaccinations_per_million
+
+vaccine_df['daily_vaccinations'] = vaccine_df['daily_vaccinations'].fillna(0)
+vaccine_df['daily_vaccinations_per_million'] = vaccine_df['daily_vaccinations_per_million'].fillna(0)
+
+#print(vaccine_df.isna().sum())
+
+#people_fully_vaccinated and people_fully_vaccinated_per_hundred
+vaccine_df['people_fully_vaccinated'] = vaccine_df['people_fully_vaccinated'].fillna(0)
+vaccine_df['people_fully_vaccinated_per_hundred'] = vaccine_df['people_fully_vaccinated_per_hundred'].fillna(0)
 
 
+#daily_vaccinations_raw
+vaccine_df['daily_vaccinations_raw'] = vaccine_df['daily_vaccinations_raw'].fillna(0)
+#print(vaccine_df.isna().sum())
+
+#negative vaccine numbers
+vaccine_df = vaccine_df.drop(vaccine_df[vaccine_df['people_vaccinated'] < 0].index)
+#%%
+#Testing on USA data (old)
 #selecting USA rows
-'''USA = df[df.country == 'United States']
+'''USA = vaccine_df[vaccine_df.country == 'United States']
 x = USA['date']
-y = USA['people_fully_vaccinated_per_hundred']
+y = USA['people_vaccinated_per_hundred']
 
 #plotting USA Vaccinations
 USA_fig = plt.figure()
 plt.scatter(x, y)
 #plt.xticks(rotation=90)
-#labeling graph
+
 plt.title('Total People Vaccinated Over Time in the United States')
 plt.xlabel('Date')
 plt.ylabel('Percentage of People Fully Vacinated')
 plt.show()'''
 
-#clean up massive dataset
-df2 = pd.read_csv('/Users/Brian/PycharmProjects/CreateTask/owid-covid-data.csv')
 
-corrmat = df2.corr()
-f, ax = plt.subplot(figsize=(12,9))
-sns.heatmap(corrmat, vmax=.8, square = True);
+#%%
+#%%
+#EDA
 
-#find vaccination rate
-#heatmap to find factors that correlate the most
-#plug into regression 
-#input for country
-#app to display output
+#selecting lastest vaccine numbers
+'''latest_num = vaccine_df.groupby(['country','iso_code']).people_vaccinated.max().reset_index()
+
+latest_sorted = latest_num.sort_values('people_vaccinated')
+top_countries = latest_sorted[-20:]
+
+fig, ax = plt.subplots()
+ax.barh(top_countries['country'], top_countries['people_vaccinated'])
+plt.xticks(rotation=30)
+plt.ylabel('Countries')
+plt.xlabel('Number of Vaccinated Citizens (Hundred Millions)')
+plt.title('Top 20 Vaccinated Countries')
+
+#World Map
+
+latest_num['people_vaccinated_scale'] = np.log10(latest_num['people_vaccinated'])
+
+pio.renderers.default = 'chrome'
+fig = px.choropleth(latest_num, 
+              locations='iso_code',  
+              color = 'people_vaccinated_scale',
+              hover_name = 'country',
+              hover_data = ['people_vaccinated'],
+              title = 'People Vaccinated Per Country',
+              labels = {'people_vaccinated_scale': 'People Vaccinated Scaled ',
+                        'people_vaccinated': 'Number of People Vaccinated ',
+                        'iso_code': 'Code '}
+              )
+fig.show()'''
+
+#%%
+#Cleaning Population Dataset
+pop_df = pd.read_csv('/Users/Brian/PycharmProjects/CreateTask/population_by_country_2020.csv')
+pop_df.rename(columns = {
+    'Country (or dependency)': 'country',
+    'Population (2020)': 'population',
+    'World Share': 'world_share'},
+    inplace = True)
+pop_df = pop_df[['country', 'population', 'world_share']]
+
+#Finding Percentage of Population Vaccinated 
+world_vaccinated = vaccine_df[['country','date','people_vaccinated' ,'people_fully_vaccinated']]
+vaccine_pop = pd.merge(pop_df, world_vaccinated)
+#Vaccine Rate Variables
+vaccine_pop['vaccine_rate'] = (vaccine_pop['people_vaccinated'] / vaccine_pop['population']) * 100
+vaccine_pop['full_vaccine_rate'] = (vaccine_pop['people_fully_vaccinated'] / vaccine_pop['population']) * 100
+
+
+
+#%%
+#Tracking And Predicting Vaccination Progress
+
+#Organizing Date
+vaccine_pop['date'] = pd.to_datetime(vaccine_pop['date'], format = '%Y-%m-%d')
+vaccine_pop['date_ordinal'] = pd.to_datetime(vaccine_pop['date']).apply(lambda date: date.toordinal())
+
+#TEST
+#print('p-value : {}'.format(sm.tsa.stattools.adfuller(vaccine_pop['date'])[1]))
+#vaccine_pop['vaccine_rate_box'], 1 = scipy.stats.boxcox
+
+
+
+#Linear Regression
+most_dates = vaccine_pop.groupby(['country']).date.count().sort_values(ascending=False)
+
+country = 'United States'
+country_rows = vaccine_pop[vaccine_pop['country'] == country]
+#train_data = country_rows[:int(len(country_rows) * .80)]
+#test_data = country_rows[int(len(country_rows) * .80):]
+
+
+x_values = country_rows[['date_ordinal']]
+y_values = country_rows[['vaccine_rate']]
+
+fig, ax = plt.subplots()
+
+ax.scatter(x_values, y_values)
+
+line_fitter = LinearRegression()
+line_fitter.fit(x_values, y_values)
+predicted_vaccine_rate = line_fitter.predict(x_values)
+ax.plot(x_values, predicted_vaccine_rate)
+
+ax.grid()
+ax.set_xlabel('Date')
+new_labels = [date.fromordinal(int(item)) for item in ax.get_xticks()]
+ax.set_xticklabels(new_labels, rotation=30)
+
+
+#Predicting Next Month
+
+latest_date = country_rows.loc[country_rows.index[-1], 'date_ordinal']
+
+future_x = np.arange(latest_date, latest_date + 250). reshape(-1,1)
+future_y = line_fitter.predict(future_x)
+ax.plot(future_x, future_y)
+ax.set_ylim([0, 120])
+
 
 
