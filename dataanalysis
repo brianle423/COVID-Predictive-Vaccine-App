@@ -14,8 +14,6 @@ import seaborn as sns
 from sklearn.linear_model import LinearRegression
 import scipy
 from scipy import stats
-from scipy.optimize import curve_fit
-import statsmodels.api as sm
 from shapely.geometry import LineString, Point
 
 import warnings
@@ -70,30 +68,12 @@ vaccine_df['daily_vaccinations_raw'] = vaccine_df['daily_vaccinations_raw'].fill
 
 #negative vaccine numbers
 vaccine_df = vaccine_df.drop(vaccine_df[vaccine_df['people_vaccinated'] < 0].index)
-#%%
-#Testing on USA data (old)
-#selecting USA rows
-'''USA = vaccine_df[vaccine_df.country == 'United States']
-x = USA['date']
-y = USA['people_vaccinated_per_hundred']
 
-#plotting USA Vaccinations
-USA_fig = plt.figure()
-plt.scatter(x, y)
-#plt.xticks(rotation=90)
-
-plt.title('Total People Vaccinated Over Time in the United States')
-plt.xlabel('Date')
-plt.ylabel('Percentage of People Fully Vacinated')
-plt.show()'''
-
-
-#%%
 #%%
 #EDA
-
+'''
 #selecting lastest vaccine numbers
-'''latest_num = vaccine_df.groupby(['country','iso_code']).people_vaccinated.max().reset_index()
+latest_num = vaccine_df.groupby(['country','iso_code']).people_vaccinated.max().reset_index()
 
 latest_sorted = latest_num.sort_values('people_vaccinated')
 top_countries = latest_sorted[-20:]
@@ -120,8 +100,8 @@ fig = px.choropleth(latest_num,
                         'people_vaccinated': 'Number of People Vaccinated ',
                         'iso_code': 'Code '}
               )
-fig.show()'''
-
+fig.show()
+'''
 #%%
 #Cleaning Population Dataset
 pop_df = pd.read_csv('/Users/Brian/PycharmProjects/CreateTask/population_by_country_2020.csv')
@@ -148,47 +128,60 @@ vaccine_pop['full_vaccine_rate'] = (vaccine_pop['people_fully_vaccinated'] / vac
 vaccine_pop['date'] = pd.to_datetime(vaccine_pop['date'], format = '%Y-%m-%d')
 vaccine_pop['date_ordinal'] = pd.to_datetime(vaccine_pop['date']).apply(lambda date: date.toordinal())
 
-#TEST
-#print('p-value : {}'.format(sm.tsa.stattools.adfuller(vaccine_pop['date'])[1]))
-#vaccine_pop['vaccine_rate_box'], 1 = scipy.stats.boxcox
+most_dates = vaccine_pop.groupby(['country']).date.count().sort_values(ascending=False).reset_index()
+most_data = vaccine_pop.groupby(['country']).people_fully_vaccinated.count().sort_values(ascending=False).reset_index()
+#Linear Regression  
 
+def vaccineDate(country, full):
 
+    country_rows = vaccine_pop[vaccine_pop['country'] == country]
+    
+    x_values = country_rows[['date_ordinal']]
+    
+    if full is True:
+        y_values = country_rows[['full_vaccine_rate']]
+    else:
+        y_values = country_rows[['vaccine_rate']]
+        
+    fig, ax = plt.subplots()
+    ax.scatter(x_values, y_values, label = 'Real Vaccine Data')
+    
+    line_fitter = LinearRegression()
+    line_fitter.fit(x_values, y_values)
+    predicted_vaccine_rate = line_fitter.predict(x_values)
+    r2_score = 1 - line_fitter.score(x_values , y_values)
+    ax.plot(x_values, predicted_vaccine_rate, 'orange', label = 'Current Vaccine Progress')
 
-#Linear Regression
-most_dates = vaccine_pop.groupby(['country']).date.count().sort_values(ascending=False)
-
-country = 'United States'
-country_rows = vaccine_pop[vaccine_pop['country'] == country]
-#train_data = country_rows[:int(len(country_rows) * .80)]
-#test_data = country_rows[int(len(country_rows) * .80):]
-
-
-x_values = country_rows[['date_ordinal']]
-y_values = country_rows[['vaccine_rate']]
-
-fig, ax = plt.subplots()
-
-ax.scatter(x_values, y_values)
-
-line_fitter = LinearRegression()
-line_fitter.fit(x_values, y_values)
-predicted_vaccine_rate = line_fitter.predict(x_values)
-ax.plot(x_values, predicted_vaccine_rate)
-
-ax.grid()
-ax.set_xlabel('Date')
-new_labels = [date.fromordinal(int(item)) for item in ax.get_xticks()]
-ax.set_xticklabels(new_labels, rotation=30)
-
-
-#Predicting Next Month
-
-latest_date = country_rows.loc[country_rows.index[-1], 'date_ordinal']
-
-future_x = np.arange(latest_date, latest_date + 250). reshape(-1,1)
-future_y = line_fitter.predict(future_x)
-ax.plot(future_x, future_y)
-ax.set_ylim([0, 120])
-
+    ax.grid('both')
+    ax.set_xlabel('Date')
+    ax.set_ylabel('Percentage of Population Vaccinated')
+    ax.set_title('Prediction for ' + country + '\'s Vaccine Progress')
+    ax.set_ylim([0, 100])
+      
+    #Predicting When Country Will Be 100% Vaccinated
+    
+    first_date = country_rows.loc[country_rows.index[0], 'date_ordinal']
+    latest_date = country_rows.loc[country_rows.index[-1], 'date_ordinal']
+    xrange = int(100/line_fitter.coef_)
+    predicted_date = latest_date + xrange
+    
+    future_x = np.arange(latest_date, predicted_date).reshape(-1,1)
+    future_y = line_fitter.predict(future_x)
+    ax.plot(future_x, future_y, '--',color = '#f24e35', label='Future Vaccine Progress')
+    
+    ax.set_xlim([first_date, predicted_date])
+    new_labels = [date.fromordinal(int(item)) for item in ax.get_xticks()]
+    ax.set_xticklabels(new_labels, rotation=30)
+    ax.legend(loc='lower right')
+    
+    over_hundred = future_x[future_y > 100]
+    first_hundred = datetime.datetime.fromordinal(over_hundred[0])
+    current_date = datetime.datetime.now()
+    time_til_hundred = first_hundred - current_date
+    
+    print('Time until ' + country + ' is fully vaccinated: ', time_til_hundred)
+    print('Estimated Date: ' + str(first_hundred))
+    
+vaccineDate('Italy', False)
 
 
