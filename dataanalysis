@@ -71,7 +71,7 @@ vaccine_df = vaccine_df.drop(vaccine_df[vaccine_df['people_vaccinated'] < 0].ind
 
 #%%
 #EDA
-'''
+
 #selecting lastest vaccine numbers
 latest_num = vaccine_df.groupby(['country','iso_code']).people_vaccinated.max().reset_index()
 
@@ -98,10 +98,11 @@ fig = px.choropleth(latest_num,
               title = 'People Vaccinated Per Country',
               labels = {'people_vaccinated_scale': 'People Vaccinated Scaled ',
                         'people_vaccinated': 'Number of People Vaccinated ',
-                        'iso_code': 'Code '}
+                        'iso_code': 'Code '},
+              color_continuous_scale = 'Oranges'
               )
 fig.show()
-'''
+
 #%%
 #Cleaning Population Dataset
 pop_df = pd.read_csv('/Users/Brian/PycharmProjects/CreateTask/population_by_country_2020.csv')
@@ -113,13 +114,40 @@ pop_df.rename(columns = {
 pop_df = pop_df[['country', 'population', 'world_share']]
 
 #Finding Percentage of Population Vaccinated 
-world_vaccinated = vaccine_df[['country','date','people_vaccinated' ,'people_fully_vaccinated']]
+world_vaccinated = vaccine_df[['country','iso_code','date','people_vaccinated' ,'people_fully_vaccinated']]
 vaccine_pop = pd.merge(pop_df, world_vaccinated)
 #Vaccine Rate Variables
 vaccine_pop['vaccine_rate'] = (vaccine_pop['people_vaccinated'] / vaccine_pop['population']) * 100
 vaccine_pop['full_vaccine_rate'] = (vaccine_pop['people_fully_vaccinated'] / vaccine_pop['population']) * 100
 
+#%%
+#More EDA
 
+latest_rate = vaccine_pop.groupby(['country', 'iso_code']).vaccine_rate.max().reset_index()
+rate_sorted = latest_rate.sort_values('vaccine_rate')
+top_country_rate = rate_sorted[-20:]
+
+#Bar Chart By Vaccine Percentage
+fig, ax = plt.subplots()
+ax.barh(top_country_rate['country'], top_country_rate['vaccine_rate'], color = 'orange')
+plt.ylabel('Countries')
+plt.xlabel('Percentage of Vaccinated Citizens')
+plt.title('Top 20 Vaccinated Countries By Percentage')
+
+#World Map By Vaccine Percentage
+pio.renderers.default = 'chrome'
+fig = px.choropleth(latest_rate, 
+              locations='iso_code',  
+              color = 'vaccine_rate',
+              hover_name = 'country',
+              hover_data = ['vaccine_rate'],
+              title = 'Percentage of People Vaccinated Per Country',
+              labels = {'vaccine_rate_scale': 'Percentage of People Vaccinated Scaled ',
+                        'vaccine_rate': 'Percentage of People Vaccinated ',
+                        'iso_code': 'Code ',},
+              color_continuous_scale = 'Reds'
+              )
+fig.show()
 
 #%%
 #Tracking And Predicting Vaccination Progress
@@ -182,6 +210,6 @@ def vaccineDate(country, full):
     print('Time until ' + country + ' is fully vaccinated: ', time_til_hundred)
     print('Estimated Date: ' + str(first_hundred))
     
-vaccineDate('Italy', False)
+vaccineDate('Chile', False)
 
 
