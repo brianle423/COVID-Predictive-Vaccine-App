@@ -23,7 +23,6 @@ from datetime import date
 #Plotly
 import plotly.express as px
 import plotly.io as pio
-import json
 
 warnings.filterwarnings('ignore')
 
@@ -177,15 +176,16 @@ def vaccineDate(country, full):
     line_fitter = LinearRegression()
     line_fitter.fit(x_values, y_values)
     predicted_vaccine_rate = line_fitter.predict(x_values)
-    r2_score = 1 - line_fitter.score(x_values , y_values)
+    r2_score = line_fitter.score(x_values , y_values)
+    
     ax.plot(x_values, predicted_vaccine_rate, 'orange', label = 'Current Vaccine Progress')
-
     ax.grid('both')
     ax.set_xlabel('Date')
     ax.set_ylabel('Percentage of Population Vaccinated')
     ax.set_title('Prediction for ' + country + '\'s Vaccine Progress')
     ax.set_ylim([0, 100])
-      
+    sns.despine(left=True, bottom=True)
+        
     #Predicting When Country Will Be 100% Vaccinated
     
     first_date = country_rows.loc[country_rows.index[0], 'date_ordinal']
@@ -195,21 +195,28 @@ def vaccineDate(country, full):
     
     future_x = np.arange(latest_date, predicted_date).reshape(-1,1)
     future_y = line_fitter.predict(future_x)
-    ax.plot(future_x, future_y, '--',color = '#f24e35', label='Future Vaccine Progress')
     
+    ax.plot(future_x, future_y, '--',color = '#f24e35', label='Future Vaccine Progress')
     ax.set_xlim([first_date, predicted_date])
     new_labels = [date.fromordinal(int(item)) for item in ax.get_xticks()]
     ax.set_xticklabels(new_labels, rotation=30)
     ax.legend(loc='lower right')
+    
+    x = np.arange(latest_date, predicted_date)
+    df_future_y = (pd.DataFrame(future_y, columns = ['y']))
+    y_upper = [i * ((1-r2_score)+1) for i in df_future_y['y']]
+    y_lower = [i * r2_score for i in df_future_y['y']]
+    ax.fill_between(x, y_lower, y_upper, alpha = 0.2)
     
     over_hundred = future_x[future_y > 100]
     first_hundred = datetime.datetime.fromordinal(over_hundred[0])
     current_date = datetime.datetime.now()
     time_til_hundred = first_hundred - current_date
     
+    print('Model Accuracy: ' + '{:.2%}'.format(r2_score))
     print('Time until ' + country + ' is fully vaccinated: ', time_til_hundred)
     print('Estimated Date: ' + str(first_hundred))
     
-vaccineDate('Chile', False)
+vaccineDate('United States', True)
 
 
