@@ -70,7 +70,7 @@ vaccine_df = vaccine_df.drop(vaccine_df[vaccine_df['people_vaccinated'] < 0].ind
 
 #%%
 #EDA
-
+'''
 #selecting lastest vaccine numbers
 latest_num = vaccine_df.groupby(['country','iso_code']).people_vaccinated.max().reset_index()
 
@@ -100,7 +100,7 @@ fig = px.choropleth(latest_num,
                         'iso_code': 'Code '},
               color_continuous_scale = 'Oranges'
               )
-fig.show()
+fig.show()'''
 
 #%%
 #Cleaning Population Dataset
@@ -121,7 +121,7 @@ vaccine_pop['full_vaccine_rate'] = (vaccine_pop['people_fully_vaccinated'] / vac
 
 #%%
 #More EDA
-
+'''
 latest_rate = vaccine_pop.groupby(['country', 'iso_code']).vaccine_rate.max().reset_index()
 rate_sorted = latest_rate.sort_values('vaccine_rate')
 top_country_rate = rate_sorted[-20:]
@@ -146,7 +146,7 @@ fig = px.choropleth(latest_rate,
                         'iso_code': 'Code ',},
               color_continuous_scale = 'Reds'
               )
-fig.show()
+fig.show()'''
 
 #%%
 #Tracking And Predicting Vaccination Progress
@@ -165,9 +165,9 @@ def vaccineDate(country, full):
     
     x_values = country_rows[['date_ordinal']]
     
-    if full is True:
+    if full == 2:
         y_values = country_rows[['full_vaccine_rate']]
-    else:
+    elif full == 1:
         y_values = country_rows[['vaccine_rate']]
         
     fig, ax = plt.subplots()
@@ -202,21 +202,25 @@ def vaccineDate(country, full):
     ax.set_xticklabels(new_labels, rotation=30)
     ax.legend(loc='lower right')
     
+    
     x = np.arange(latest_date, predicted_date)
     df_future_y = (pd.DataFrame(future_y, columns = ['y']))
     y_upper = [i * ((1-r2_score)+1) for i in df_future_y['y']]
     y_lower = [i * r2_score for i in df_future_y['y']]
     ax.fill_between(x, y_lower, y_upper, alpha = 0.2)
     
+    graph = plt.savefig('country.png')
+    
     over_hundred = future_x[future_y > 100]
     first_hundred = datetime.datetime.fromordinal(over_hundred[0])
     current_date = datetime.datetime.now()
     time_til_hundred = first_hundred - current_date
     
-    print('Model Accuracy: ' + '{:.2%}'.format(r2_score))
+    print('Model Accuracy: {:.2%}'.format(r2_score))
     print('Time until ' + country + ' is fully vaccinated: ', time_til_hundred)
     print('Estimated Date: ' + str(first_hundred))
+    return graph
     
-vaccineDate('United States', True)
+vaccineDate('United States', 2)
 
 
